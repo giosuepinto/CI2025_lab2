@@ -3,6 +3,9 @@
 Author: Giosuè Pinto (s342711@studenti.polito.it)
 Github: https://github.com/giosuepinto
 
+In collaboration with Francesco Palmisani s343429
+
+
 -----------------------
 1. Project Overview
 -----------------------
@@ -64,6 +67,88 @@ This solver is modular. It selects the right "tool" for the job based on problem
     * `order_crossover`: $O(N)$ crossover (works for all problem types).
     * `tournament_selection`: $O(k)$ selection.
     * `smart_probabilistic_init` / `fast_random_init`: Heuristic or fast initializers.
+
+
+
+ALGORITHM OPERATOR SUMMARY
+-------------------------------------------
+
+inversion_mutation (Inversion Mutation)
+-------------------------------------------
+* PURPOSE: To introduce a small perturbation (a single random 2-Opt move) into a solution.
+* HOW IT WORKS:
+    1.  Takes a solution: [1, 2, 3, 4, 5, 6, 7]
+    2.  Picks two random indices (e.g., 2 and 5).
+    3.  Identifies the segment between them: [3, 4, 5, 6]
+    4.  INVERTS the segment: [6, 5, 4, 3]
+    5.  Replaces the original segment.
+    6.  RESULT: [1, 2, 6, 5, 4, 3, 7]
+* COST LOGIC: It breaks the edges (2->3) and (6->7) and reconnects them "crossed" (2->6) and (3->7).  This only works if the cost of path (3-4-5-6) is equal to (6-5-4-3).
+
+local_search_2opt (Systematic 2-Opt Optimizer)
+--------------------------------------------------
+* PURPOSE: To improve a solution until it reaches a "local optimum" (no 2-Opt move can improve it further). This is a hill-climbing descent algorithm.
+* HOW IT WORKS:
+    1.  Takes a solution (e.g., Cost 100).
+    2.  Starts a double loop 'for i' and 'for j' to test EVERY possible 2-Opt inversion.
+    3.  ATTEMPT (i=1, j=4): Vector [1, | 5, 2, 3, 6, | 4, 7]
+    4.  Segment: [5, 2, 3, 6]. Inversion: [6, 3, 2, 5]
+    5.  New Vector: [1, 6, 3, 2, 5, 4, 7]
+    6.  COST CHECK (O(1) Delta): Calculates only the difference:
+        (cost(1,6) + cost(5,4)) - (cost(1,5) + cost(6,4))
+    7.  If the Delta is negative (e.g., new Cost 95), the move is an improvement.
+    8.  ACTION: Keeps the new solution and RESTARTS the entire process from the beginning.
+    9.  TERMINATES: Only when a full double-loop finds no improvements.
+
+
+swap_mutation (Swap Mutation)
+--------------------------------
+* PURPOSE: To introduce an "asymmetry-safe" mutation.
+* HOW IT WORKS:
+    1.  Takes a solution: [1, 2, 3, 4, 5, 6, 7]
+    2.  Picks two random indices (e.g., 2 and 5).
+    3.  Values at indices: 3 and 6
+    4.  SWAPS the values:
+    5.  RESULT: [1, 2, 6, 4, 5, 3, 7]
+* COST LOGIC: Breaks 4 edges (e.g., 2->3, 3->4, 5->6, 6->7) and creates 4 new ones (2->6, 6->4, 5->3, 3->7). The cost must be explicitly recalculated.
+
+local_search_insertion (Insertion Optimizer)
+-----------------------------------------------
+* PURPOSE: The 2-Opt equivalent for asymmetric problems.
+* HOW IT WORKS:
+    1.  Takes a solution (e.g., Cost 100).
+    2.  Starts a double loop 'for i' (city to move) and 'for j' (position to insert after).
+    3.  ATTEMPT (i=1, j=3): Move city '5' (at index 1) and insert it AFTER city '3' (at index 3). 
+    4.  INITIAL STATE: [...1 -> 5 -> 2...] and [...3 -> 4...]
+    5.  FINAL STATE: [...1 -> 2...] and [...3 -> 5 -> 4...]
+    6.  COST CHECK (O(1) Delta):
+        * Costs Removed: cost(1,5) + cost(5,2) + cost(3,4)
+        * Costs Added:   cost(1,2) + cost(3,5) + cost(5,4)
+        * Delta = Added - Removed
+    7.  If Delta < 0, the move is an improvement.
+    8.  ACTION: Saves the move (if "best improvement") or applies it (if "first improvement") and restarts.
+    9.  TERMINATES: When a full double-loop finds no improvements.
+
+
+order_crossover (OX1)
+-------------------------
+* PURPOSE: To create a valid child from two parents, preserving a block from P1 and the relative order from P2. 
+* HOW IT WORKS:
+    1.  Parent 1 (P1): [8, 4, | 7, 3, 6, | 2, 5, 1, 9]
+    2.  Parent 2 (P2): [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    3.  A random segment is chosen from P1 (e.g., indices 2-4): [7, 3, 6]
+    4.  The segment is copied to the child:
+        Child: [_, _, 7, 3, 6, _, _, _, _]
+    5.  A lookup (boolean array) is created for the copied cities: {7, 3, 6}
+    6.  Iterate through P2 from the start, filling the gaps (_) with cities NOT in the lookup:
+        * P2[0] = 1 (Not in lookup) -> Child: [1, _, 7, 3, 6, _, _, _, _]
+        * P2[1] = 2 (Not in lookup) -> Child: [1, 2, 7, 3, 6, _, _, _, _]
+        * P2[2] = 3 (IS in lookup)   -> Skip
+        * P2[3] = 4 (Not in lookup) -> Child: [1, 2, 7, 3, 6, 4, _, _, _]
+        * ...and so on...
+    7.  RESULT: [1, 2, 7, 3, 6, 4, 5, 8, 9]
+
+
 
 -----------------------
 4. The Final Adaptive Algorithm Explained
